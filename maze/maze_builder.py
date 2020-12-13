@@ -83,44 +83,54 @@ def create_obstacles():
         obstacles.append((i,80))
 
 
-def is_position_blocked(x, y):
-    """Loops through object_list to see if the
-       parameter coordinates is inside one of the objects
-
-    Args:
-        x_cor (int): x coordinate to be checked if in any object
-        y_cor (int): y coordinate to be checked if in any object
-
-    Returns:
-        Boolean : True if coordinates is in an object else false
+def is_path_blocked(new_x, new_y, old_x, old_y):
     """
-    for obs in obstacles:
-        if (obs[0] <= x <= obs[0] + 4 and
-           obs[1] <= y <= obs[1] + 4):
-           return True
+    Checks if the path ahead in the new x and y values is blocked by an obstacle
+    """
+    for pos in obstacles:
+        checks = [0,0]
+        count_x = old_x
+        count_y = old_y
+        if count_y < new_y:
+            while count_y <= new_y:
+                if count_y in range(pos[1], pos[1]+5):
+                    checks[1] = 1
+                count_y += 1
+
+        elif count_y > new_y:
+            while count_y >= new_y:
+                if count_y in range(pos[1], pos[1]+5):
+                    checks[1] = 1
+                count_y -= 1
+
+        if count_x < new_x:
+            while count_x <= new_x:
+                if count_x in range(pos[0], pos[0]+5):
+                    checks[0] = 1
+                count_x += 1
+        
+        elif count_x > new_x:
+            while count_x >= new_x:
+                if count_x in range(pos[0], pos[0]+5):
+                    checks[0] = 1
+                count_x -= 1
+
+        
+    if is_position_blocked(new_x,new_y):
+        checks[0] = checks[1] = 1
+        
+    if checks[0] == 1 and checks[1] == 1:
+        return True
     return False
 
 
-def is_path_blocked(x1, x2, y1, y2):
-    """loops through coordinates between x1, y1 and x2, y2
-       and calls is_position_blocked to see if there is an object
-       in the path
-
-    Args:
-        x1 (int): starting x
-        y1 (int): starting y
-        x2 (int): ending x
-        y2 (int): ending y
-
-    Returns:
-        Boolean: True if there is an object on the path else false
+def is_position_blocked(new_x,new_y):
     """
-    direction_x = 1 if x2 >= x1 else -1
-    direction_y = 1 if y2 >= y1 else -1
-    for x in range(x1, x2 + direction_x, direction_x):
-        for y in range(y1, y2 + direction_y, direction_y):
-            if is_position_blocked(x, y):
-                return True
+    Checks if the position that the robot want to occupy is actually an obstacle space
+    """
+    for pos in obstacles:
+        if new_x in range(pos[0],pos[0]+5) and new_y in range(pos[1],pos[1]+5):
+            return True
     return False
 
 

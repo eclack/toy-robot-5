@@ -1,32 +1,35 @@
+import sys
+from sys import argv
+import mazerun
+# from world.text import world as text_world
+# from world.turtle import world as turtle_world
+
+
+try:
+    if argv[1] == 'turtle':
+        from world.turtle import world as text_world
+    else:
+        from world.text import world as text_world
+except IndexError:
+    import world.text.world as text_world
+
 """
 TODO: You can either work from this skeleton, or you can build on your solution for Toy Robot 3 exercise.
 """
-import mazerun
-import sys
-import import_helper
-if len(sys.argv) > 2:
-    if 'maze' in sys.argv[2]:
-        obstacles = import_helper.dynamic_import('maze.' + sys.argv[2])
-        module_loaded = sys.argv[2]
-    else:
-        obstacles = import_helper.dynamic_import('maze.obstacles')
-        module_loaded = 'obstacles'
-else:
-    obstacles = import_helper.dynamic_import('maze.obstacles')
-    module_loaded = 'obstacles'
-if 'turtle' in sys.argv:
-    from world.turtle import world as world_text
-    module_loaded = 'obstacles'
-else:
-    from world.text import world as world_text
-    module_loaded = 'obstacles'
+
 # list of valid command names
 valid_commands = ['off', 'help', 'replay', 'forward', 'back', 'right', 'left', 'sprint', 'mazerun']
 move_commands = valid_commands[3:]
+
+
 #commands history
 history = []
 
+
 def get_robot_name():
+    """
+    Asks the user for the robot name
+    """
     name = input("What do you want to name your robot? ")
     while len(name) == 0:
         name = input("What do you want to name your robot? ")
@@ -76,9 +79,9 @@ def valid_command(command):
     """
     Returns a boolean indicating if the robot can understand the command or not
     Also checks if there is an argument to the command, and if it a valid int
-    Also checking if mazerun is given as a command followed by an arguement.
     """
-
+    move_commands = ["forward","back","sprint","replay","mazerun"]
+    mazerun_locs = ["top","","right","left","bottom"]
     (command_name, arg1) = split_command_input(command)
 
     if command_name.lower() == 'replay':
@@ -94,12 +97,12 @@ def valid_command(command):
                 range_args = range_args.split('-')
                 return is_int(range_args[0]) and is_int(range_args[1]) and len(range_args) == 2
     elif command_name.lower() == 'mazerun':
-        if len(arg1.strip()) == 0:
-            return True
-        elif (arg1.lower().find('top') > -1 or arg1.lower().find('bottom') > -1 or arg1.lower().find('left') > -1 or arg1.lower().find('right') > -1) \
-            and len(arg1.lower().replace('top', '').replace('bottom','').replace('left', '').replace('right', '').strip()) == 0:
+        if arg1 in mazerun_locs:
             return True
     else:
+        if command.lower() in move_commands:
+            if arg1 == '':
+                return False
         return command_name.lower() in valid_commands and (len(arg1) == 0 or is_int(arg1))
 
 
@@ -121,6 +124,7 @@ RIGHT - turn right by 90 degrees
 LEFT - turn left by 90 degrees
 SPRINT - sprint forward according to a formula
 REPLAY - replays all movement commands from history [FORWARD, BACK, RIGHT, LEFT, SPRINT]
+MAZERUN - attempts to automatically solve the maze that is given to it
 """
 
 
@@ -171,28 +175,31 @@ def do_replay(robot_name, arguments):
         (do_next, command_output) = call_command(command_name, command_arg, robot_name)
         if not silent:
             print(command_output)
-            world_text.show_position(robot_name)
+            text_world.show_position(robot_name)
 
     return True, ' > '+robot_name+' replayed ' + str(len(commands_to_replay)) + ' commands' + (' in reverse' if reverse else '') + (' silently.' if silent else '.')
 
 
 def call_command(command_name, command_arg, robot_name):
+    """
+    This determines what kind of command the user is giving to the robot
+    """
     if command_name == 'help':
         return do_help()
     elif command_name == 'forward':
-        return world_text.do_forward(robot_name, int(command_arg))
+        return text_world.do_forward(robot_name, int(command_arg))
     elif command_name == 'back':
-        return world_text.do_back(robot_name, int(command_arg))
+        return text_world.do_back(robot_name, int(command_arg))
     elif command_name == 'right':
-        return world_text.do_right_turn(robot_name)
+        return text_world.do_right_turn(robot_name)
     elif command_name == 'left':
-        return world_text.do_left_turn(robot_name)
+        return text_world.do_left_turn(robot_name)
     elif command_name == 'sprint':
-        return world_text.do_sprint(robot_name, int(command_arg))
+        return text_world.do_sprint(robot_name, int(command_arg))
     elif command_name == 'replay':
         return do_replay(robot_name, command_arg)
     elif command_name == 'mazerun':
-        return mazerun.start_mazerunner(robot_name,command_arg)
+        return mazerun.start_mazerun(robot_name,command_arg)
     return False, None
 
 
@@ -207,12 +214,13 @@ def handle_command(robot_name, command):
     (command_name, arg) = split_command_input(command)
 
     if command_name == 'off':
+        reset_robot()
         return False
     else:
         (do_next, command_output) = call_command(command_name, arg, robot_name)
 
     print(command_output)
-    world_text.show_position(robot_name)
+    text_world.show_position(robot_name)
     add_to_history(command)
 
     return do_next
@@ -227,40 +235,33 @@ def add_to_history(command):
     history.append(command)
 
 
-def robot_reset():
-    """
-    This function is used to reset all global variables of the robot.
-    """
-    global history
-
-    world_text.position_x = 0
-    world_text.position_y = 0
-    world_text.current_direction_index = 0
-    history = []
-
-
 def robot_start():
     """This is the entry point for starting my robot"""
+
+    global position_x, position_y, current_direction_index, history
 
     robot_name = get_robot_name()
     output(robot_name, "Hello kiddo!")
 
-    robot_reset()
-    if len(sys.argv) == 3:
-        print(robot_name + ": Loaded " + module_loaded + ".")
-    elif len(sys.argv) == 2:
-        print(robot_name + ": Loaded " + module_loaded + ".")
-    else :
-        print(robot_name + ": Loaded " + module_loaded + ".")
-    world_text.show_obstacles()
-
+    position_x = 0
+    position_y = 0
+    current_direction_index = 0
+    history = []
+    text_world.setup(robot_name,argv)
 
     command = get_command(robot_name)
     while handle_command(robot_name, command):
         command = get_command(robot_name)
 
     output(robot_name, "Shutting down..")
-    robot_reset()
+
+
+def reset_robot():
+    text_world.current_direction_index = 0
+    text_world.obstacles_list.clear()
+    history.clear()
+    text_world.position_x = 0
+    text_world.position_y = 0
 
 
 if __name__ == "__main__":

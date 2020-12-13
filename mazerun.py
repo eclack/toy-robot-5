@@ -1,220 +1,196 @@
 import robot
-import sys
-import import_helper
-# import time
-# start_time = time.time()
-if len(sys.argv) > 1 and sys.argv[1].lower() == "turtle" :
-    import world.turtle.world as world
-else :
-    import world.text.world as world
 
-
-if len(sys.argv) > 2:
-    if 'maze' in sys.argv[2]:
-        obstacles = import_helper.dynamic_import('maze.' + sys.argv[2])
+try:
+    if robot.argv[1] == 'turtle':
+        from world.turtle import world as text_world
     else:
-        obstacles = import_helper.dynamic_import('maze.obstacles')
-else:
-    obstacles = import_helper.dynamic_import('maze.obstacles')
+        from world.text import world as text_world
+except IndexError:
+    import world.text.world as text_world
+
+
+# Globals to store turns that have been made
+made_right_turns = set()
+made_left_turns = set()
+open_side_space = set()
+been_before = set()
+
+
+def start_mazerun(robot_name,command_arg):
+	"""
+	Starts all the initiation for the mazerun
+	"""
+	global wanted_exit
+	if command_arg.lower() == "top" or command_arg == "":
+		wanted_exit = "top"
+	if command_arg.lower() == "right":
+		wanted_exit = "right"
+	if command_arg.lower() == "left":
+		wanted_exit = "left"
+	if command_arg.lower() == "bottom":
+		wanted_exit = "bottom"
+
+	print(f" > {robot_name} starting maze run..")
+	start_moving(robot_name)
+	if escaped:
+		return True, (f" > {robot_name} now at the {wanted_exit} edge.")
+
+
+def add_to_right_turns():
+	global made_right_turns
+	x = text_world.position_x
+	y = text_world.position_y
+	made_right_turns.add((x,y))
+
+
+def check_escaped():
+	x = text_world.position_x
+	y = text_world.position_y
+	direction = text_world.current_direction_index
+
+	if wanted_exit == "top" or wanted_exit == "":
+		if direction == 0 and y == 200:
+			return True
+	if wanted_exit == "right":
+		if direction == 1 and x == 100:
+			return True
+	if wanted_exit == "bottom":
+		if direction == 2 and y == -200:
+			return True
+	if wanted_exit == "left":
+		if direction == 3 and x == -100:
+			return True
+	return False
 
 
 
+def left_not_blocked():
+	x = text_world.position_x
+	y = text_world.position_y
+	direction = text_world.current_direction_index
 
-stored_forward = set()
-stored_left_turns = set()
-stored_right_turn = set()
-end_x = 0
-end_y = 0
-
-
-def next_out_of_bounds():
-    """
-    Looking if the next block is on the boundry of our maze/safe area.
-    """
-    if world.current_direction_index == 0 and world.position_y == 200:
-        return True
-    elif world.current_direction_index == 1 and world.position_x == 100:
-        return True
-    elif world.current_direction_index == 2 and world.position_y == -200:
-        return True
-    elif world.current_direction_index == 3 and world.position_x == -100:
-        return True
-    else:
-        return False
+	if direction == 0:
+		return text_world.is_position_allowed(x-1,y,x,y)
+	if direction == 1:
+		return text_world.is_position_allowed(x,y+1,x,y)
+	if direction == 2:
+		return text_world.is_position_allowed(x+1,y,x,y)
+	if direction == 3:
+		return text_world.is_position_allowed(x,y-1,x,y)
+	return False
 
 
-def next_blocked():
-    """
-    Looking if the next block is blocked by an obstacle.
-    """
-    if world.current_direction_index == 0:
-        return obstacles.is_position_blocked(world.position_x, world.position_y + 1)
-    elif world.current_direction_index == 1:
-        return obstacles.is_position_blocked(world.position_x + 1, world.position_y)
-    elif world.current_direction_index == 2:
-        return obstacles.is_position_blocked(world.position_x, world.position_y - 1)
-    elif world.current_direction_index == 3:
-        return obstacles.is_position_blocked(world.position_x - 1, world.position_y)
+def right_not_blocked():
+	x = text_world.position_x
+	y = text_world.position_y
+	direction = text_world.current_direction_index
+
+	if direction == 0:
+		return text_world.is_position_allowed(x+1,y,x,y)
+	if direction == 1:
+		return text_world.is_position_allowed(x,y-1,x,y)
+	if direction == 2:
+		return text_world.is_position_allowed(x-1,y,x,y)
+	if direction == 3:
+		return text_world.is_position_allowed(x,y+1,x,y)
+	return False	
 
 
-def right_blocked():
-    """
-    Looking if the block to the right is blocked by an obstacle.
-    """
-    if world.current_direction_index == 0:
-        return obstacles.is_position_blocked(world.position_x + 1, world.position_y)
-    elif world.current_direction_index == 1:
-        return obstacles.is_position_blocked(world.position_x, world.position_y - 1)
-    elif world.current_direction_index == 2:
-        return obstacles.is_position_blocked(world.position_x - 1, world.position_y)
-    elif world.current_direction_index == 3:
-        return obstacles.is_position_blocked(world.position_x, world.position_y + 1)
+def is_pos_block():
+	x = text_world.position_x
+	y = text_world.position_y
+	direction = text_world.current_direction_index
+
+	if direction == 0:
+		return text_world.is_position_allowed(x,y+1,x,y)
+	if direction == 1:
+		return text_world.is_position_allowed(x+1,y,x,y)
+	if direction == 2:
+		return text_world.is_position_allowed(x,y-1,x,y)
+	if direction == 3:
+		return text_world.is_position_allowed(x-1,y,x,y)
+	return False
 
 
-def left_blocked():
-    """
-    Looking if the block to the left is blocked by an obstacle.
-    """
-    if world.current_direction_index == 0:
-        return obstacles.is_position_blocked(world.position_x - 1, world.position_y)
-    elif world.current_direction_index == 1:
-        return obstacles.is_position_blocked(world.position_x, world.position_y + 1)
-    elif world.current_direction_index == 2:
-        return obstacles.is_position_blocked(world.position_x + 1, world.position_y)
-    elif world.current_direction_index == 3:
-        return obstacles.is_position_blocked(world.position_x, world.position_y - 1)
+def check_in_right_turns():
+	x = text_world.position_x
+	y = text_world.position_y
+	if (x,y) in made_right_turns:
+		return True
+	return False
 
 
-def end_selector(name, command):
-    """
-    The end selector funtion looks at the command given ex:(top, bottom, left, right)
-    from there we look at what the end point will be.
-    after an end point is selected either mazerun_x or _y will run and solve the maze.
-    """
-    global end_x,end_y
-    if command.lower() == 'top' or command.lower() == '':
-        end_y = 200
-        mazerun_y(name)
-    elif command.lower() == 'bottom':
-        end_y = -200
-        mazerun_y(name)
-    elif command.lower() == 'left':
-        end_x = -100
-        mazerun_x(name)
-    elif command.lower() == 'right':
-        end_x = 100
-        mazerun_x(name)
+def check_in_left_turns():
+	x = text_world.position_x
+	y = text_world.position_y
+	if (x,y) in made_left_turns:
+		return True
+	return False
 
 
-def mazerun_x(name):
-    """
-    Solving the maze while pos_x != end_x
-
-    making use of a inverted left hand method(right hand method)
-    almost hugging the right wall at all times.
-    """
-    print(' > '+name+' starting maze run..')
-    while not next_blocked() and not next_out_of_bounds():                      #looking if the next block is not blocked and it isnt at the border
-        robot.handle_command(name, 'forward 1')
-    while world.position_x != end_x:                                            # while current position isnt end position.
-        if next_blocked() or next_out_of_bounds():                              # if the next block is blocked or it is out of bounds.
-            if (world.position_x,world.position_y) not in stored_left_turns:    # looking if the position is stored in the set or not.
-                stored_left_turns.add((world.position_x,world.position_y))      # if it wasn't stored, adding it to the set.
-                robot.handle_command(name, 'left')                              
-            elif (world.position_x,world.position_y) not in stored_right_turn:  # looking at a set again
-                stored_right_turn.add((world.position_x,world.position_y))      # storing if nessecary 
-                robot.handle_command(name, 'right')
-            else :
-                #the U turn of note!
-                robot.handle_command(name, 'left')
-                robot.handle_command(name, 'left')
-                stored_left_turns.discard((world.position_x,world.position_y))  #discarding saved positions so that if robot gets here again it can rerun certain tasks
-                stored_right_turn.discard((world.position_x,world.position_y))
-        elif not right_blocked():                                               # if the right block is not blocked continue
-            if (world.position_x,world.position_y) not in stored_right_turn:    # looking at saved set values again
-                stored_right_turn.add((world.position_x,world.position_y))      # storing if nessecary
-                robot.handle_command(name, 'right')
-            elif (world.position_x,world.position_y) not in stored_forward:     # looking at saved set values again
-                stored_forward.add((world.position_x,world.position_y))         # storing if nessecary
-                while not next_blocked() and not next_out_of_bounds():
-                    robot.handle_command(name, 'forward 1')
-            elif (world.position_x,world.position_y) not in stored_left_turns and not right_blocked(): # if current position is nor present in either set: go left(change direction to hopefully not get stuck)
-                stored_left_turns.add((world.position_x,world.position_y))
-                robot.handle_command(name, 'left')
-            else :
-                robot.handle_command(name, 'right')
-                robot.handle_command(name, 'forward 1')
-                stored_forward.discard((world.position_x,world.position_y))
-                stored_left_turns.discard((world.position_x,world.position_y))  #discarding saved positions so that if robot gets here again it can rerun certain tasks
-                stored_right_turn.discard((world.position_x,world.position_y))  #discarding saved positions so that if robot gets here again it can rerun certain tasks
-        else :
-            robot.handle_command(name, 'forward 1')
-    # print("--- %s seconds ---" % (time.time() - start_time))   
+def remove_pos():
+	global made_left_turns,made_right_turns
+	x = text_world.position_x
+	y = text_world.position_y
+	if (x,y) in made_left_turns and made_right_turns:
+		made_left_turns.remove((x,y))
+		made_right_turns.remove((x,y))
 
 
-def mazerun_y(name):
-    """
-    Solving the maze while pos_y != end_y
-
-    making use of a inverted left hand method(right hand method)
-    almost hugging the right wall at all times.
-
-    same as above but with different end condition. 
-    """
-    # can look at above comments as both are almost the same.
-    print(' > '+name+' starting maze run..')
-    while not next_blocked() and not next_out_of_bounds():
-        robot.handle_command(name, 'forward 1')
-    while world.position_y != end_y:
-        if next_blocked() or next_out_of_bounds():
-            if (world.position_x,world.position_y) not in stored_left_turns:
-                stored_left_turns.add((world.position_x,world.position_y))
-                robot.handle_command(name, 'left')
-            elif (world.position_x,world.position_y) not in stored_right_turn:
-                stored_right_turn.add((world.position_x,world.position_y))
-                robot.handle_command(name, 'right')
-            else :
-                #the U turn of note!
-                robot.handle_command(name, 'left')
-                robot.handle_command(name, 'left')
-                stored_left_turns.discard((world.position_x,world.position_y))
-                stored_right_turn.discard((world.position_x,world.position_y))
-        elif not right_blocked():
-            if (world.position_x,world.position_y) not in stored_right_turn:
-                stored_right_turn.add((world.position_x,world.position_y))
-                robot.handle_command(name, 'right')
-            elif (world.position_x,world.position_y) not in stored_forward:
-                stored_forward.add((world.position_x,world.position_y))
-                while not next_blocked() and not next_out_of_bounds():
-                    robot.handle_command(name, 'forward 1')
-            elif (world.position_x,world.position_y) not in stored_left_turns and not right_blocked():
-                stored_left_turns.add((world.position_x,world.position_y))
-                robot.handle_command(name, 'left')
-            else :
-                robot.handle_command(name, 'right')
-                robot.handle_command(name, 'forward 1')
-                stored_forward.discard((world.position_x,world.position_y))
-                stored_left_turns.discard((world.position_x,world.position_y))
-                stored_right_turn.discard((world.position_x,world.position_y))
-        else :
-            robot.handle_command(name, 'forward 1')
-
-    # print("--- %s seconds ---" % (time.time() - start_time))            
+def out_of_bounds():
+	x = text_world.position_x
+	y = text_world.position_y
+	direction = text_world.current_direction_index
+	
+	if wanted_exit == "top" or "":
+		if direction == 1 and x+1 == 100:
+			return True
+		if direction == 2 and y-1 == -200:
+			return True
+		if direction == 3 and x-1 == -100:
+			return True
+	if wanted_exit == "right":
+		if direction == 0 and y+1 == 200:
+			return True
+		if direction == 2 and y-1 == -200:
+			return True
+		if direction == 3 and x-1 == -100:
+			return True
+	if wanted_exit == "bottom":
+		if direction == 0 and y+1 == 200:
+			return True	
+		if direction == 1 and x+1 == 100:
+			return True
+		if direction == 3 and x-1 == -100:
+			return True
+	if wanted_exit == "left":
+		if direction == 0 and y+1 == 200:
+			return True
+		if direction == 1 and x+1 == 100:
+			return True
+		if direction == 2 and y-1 == -200:
+			return True
+	return False
 
 
-def start_mazerunner(name, command):
-    """
-    This is the main control function for the mazerunner
-    resets globals and runs the program
-    """
-    global stored_forward,stored_left_turns,stored_right_turn,end_x,end_y
-    stored_forward.clear()
-    stored_left_turns.clear()
-    stored_right_turn.clear()
-    end_x = 0
-    end_y = 0
-    end_selector(name, command)
-    if command == "top" or command == "bottom" or command == "left" or command == "right":
-        return True, ''+name+': I am at the ' +command+ ' edge.'
-    else :
-        return True, ''+name+': I am at the top edge.'
+def start_moving(robot_name):
+	global escaped
+	escaped = False
+	while not escaped:
+		while is_pos_block() and not out_of_bounds():
+			if check_been_before()
+			robot.handle_command(robot_name,"forward 1")
+			escaped = check_escaped()
+
+		
+		if right_not_blocked() and not check_in_right_turns():
+			robot.handle_command(robot_name,"right")
+			add_to_right_turns()
+		elif left_not_blocked() and not check_in_left_turns():
+			robot.handle_command(robot_name,"left")
+		elif not left_not_blocked() and check_in_right_turns():
+			robot.handle_command(robot_name,"right")
+		elif check_in_left_turns() and check_in_right_turns():
+			robot.handle_command(robot_name,"right")
+			robot.handle_command(robot_name,"right")
+			remove_pos()

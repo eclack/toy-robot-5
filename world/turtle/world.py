@@ -1,19 +1,8 @@
 import turtle
-import sys
-import import_helper
-
-if len(sys.argv) > 2:
-    if 'maze' in sys.argv[2]:
-        obstacles = import_helper.dynamic_import('maze.' + sys.argv[2])
-    else:
-        obstacles = import_helper.dynamic_import('maze.obstacles')
-else:
-    obstacles = import_helper.dynamic_import('maze.obstacles')
-
-
-# area limit vars
-min_y, max_y = -200, 200
-min_x, max_x = -100, 100
+import math
+import random
+import import_helper as ih
+from maze import obstacles
 
 # variables tracking position and direction
 position_x = 0
@@ -21,81 +10,91 @@ position_y = 0
 directions = ['forward', 'right', 'back', 'left']
 current_direction_index = 0
 
-blocked = False
-"""
-printing out the border of the robot program
-"""
-screen = turtle.Screen()
-turtle.bgcolor("white")
-turtle.title("toy_robot_5")
-screen.setworldcoordinates(-210,-210,210,210)
-robot = turtle.Turtle()
-robot.pen(pencolor = "Blue", fillcolor = "Blue", speed = 10)
-robot.shape("turtle")
-robot.penup()
-robot.goto(-100,200)
-robot.pendown()
-robot.forward(200)
-robot.right(90)
-robot.forward(400)
-robot.right(90)
-robot.forward(200)
-robot.right(90)
-robot.forward(400)
-robot.right(90)
-robot.penup()
-robot.home()
-robot.left(90)
-robot.pen(pencolor = "Black", speed = 5)
+# area limit vars
+min_y, max_y = -200, 200
+min_x, max_x = -100, 100
 
-def show_obstacles():
-    """
-    draw in the obstacles at their random points.
-    """
-    screen.tracer(0)
-    for obstacle in obstacles.get_obstacles():
-        robot.pen(pencolor = "Red", fillcolor = "red", speed = 10)
-        robot.penup()
-        robot.goto(obstacle[0], obstacle[1])
-        robot.begin_fill()
-        robot.pendown()
-        robot.forward(4)
-        robot.right(90)
-        robot.forward(4)
-        robot.right(90)
-        robot.forward(4)
-        robot.right(90)
-        robot.forward(4)
-        robot.right(90)
-        robot.end_fill()
-    screen.tracer(1)
-    robot.penup()
-    robot.goto(0,0)
-    robot.pen(pencolor="Green", fillcolor= "Green")
-    # robot.pendown()
+obstacles_list = []
 
+#Reason for not being able to move
+reason = ''
+
+
+def draw_obstacles(turtleboi):
+    turtleboi._tracer(False)
+    # print("There are some obstacles:")
+    turtleboi.pencolor("red")
+    for i in obstacles_list:
+        x = i[0]
+        y = i[1]
+        # print(f"- At position {x},{y} (to {x+4},{y+4})")
+        turtleboi.penup()
+        turtleboi.goto(x,y)
+        turtleboi.pendown()
+        turtleboi.begin_fill()
+        turtleboi.goto(x+4,y)
+        turtleboi.goto(x+4,y+4)
+        turtleboi.goto(x,y+4)
+        turtleboi.goto(x,y)
+        turtleboi.end_fill()
+    turtleboi._tracer(True)
+        
+
+
+
+def setup(robot_name,argv):
+    """
+    Sets up the main screen for turtle
+    """
+    global turtleboi
+    turtleboi = turtle.Turtle()
+
+    #Setting up border
+    turtleboi.penup()
+    turtleboi.speed(1000)
+    turtleboi.goto(100,200)
+    turtleboi.pencolor("cyan")
+    turtleboi.pensize(3)
+    turtleboi.pendown()
+    turtleboi.goto(-100,200)
+    turtleboi.goto(-100,-200)
+    turtleboi.goto(100,-200)
+    turtleboi.goto(100,200)
+    turtleboi.penup()
+
+    #Setting up the obstacles
+    global obstacles_list,module
+    try:
+        module = ih.dynamic_import(f"maze.{argv[2]}")
+        print(f"{robot_name}: Loaded {argv[2]}")
+    except IndexError:
+        module = ih.dynamic_import("maze.obstacles")
+    obstacles_list = module.get_obstacles()
+    draw_obstacles(turtleboi)
+    turtleboi.penup()
+    turtleboi.goto(0,0)
+    turtleboi.left(90)
+    turtleboi.speed(2)
+    turtleboi.pencolor("black")
+    turtleboi.pensize(0.5)
+    turtleboi.pendown()
 
 def show_position(robot_name):
     print(' > '+robot_name+' now at position ('+str(position_x)+','+str(position_y)+').')
 
 
-def is_position_allowed(position_x, position_y, new_x, new_y,):
+def is_position_allowed(new_x, new_y, old_x, old_y):
     """
     Checks if the new position will still fall within the max area limit
     :param new_x: the new/proposed x position
     :param new_y: the new/proposed y position
     :return: True if allowed, i.e. it falls in the allowed area, else False
     """
-    global blocked
-
-    if obstacles.is_path_blocked(position_x, position_y, new_x, new_y):
-        blocked = True
+    global reason
+    if module.is_path_blocked(new_x, new_y,position_x, position_y):
+        reason = True
         return False
-    elif obstacles.is_position_blocked(new_x, new_y):
-        blocked = True
-        return False
-    else :
-        return min_x <= new_x <= max_x and min_y <= new_y <= max_y
+    return min_x <= new_x <= max_x and min_y <= new_y <= max_y
 
 
 def update_position(steps):
@@ -104,24 +103,28 @@ def update_position(steps):
     :param steps:
     :return: True if the position was updated, else False
     """
-
-    global position_x, position_y
-    new_x = position_x
-    new_y = position_y
-
+    current_x,current_y = turtleboi.pos()
+    current_x = math.floor(current_x)
+    current_y = math.floor(current_y)
+    # print(f"Current X: {current_x}, Current Y: {current_y}")
     if directions[current_direction_index] == 'forward':
-        new_y = new_y + steps
+        new_y = current_y + steps
+        new_x = current_x
     elif directions[current_direction_index] == 'right':
-        new_x = new_x + steps
+        new_x = current_x + steps
+        new_y = current_y
     elif directions[current_direction_index] == 'back':
-        new_y = new_y - steps
+        new_y = current_y - steps
+        new_x = current_x
     elif directions[current_direction_index] == 'left':
-        new_x = new_x - steps
+        new_x = current_x - steps
+        new_y = current_y
 
-    if is_position_allowed(position_x, position_y, new_x, new_y):
-        position_x = new_x
-        position_y = new_y
+    if is_position_allowed(new_x, new_y, current_x, current_y):
+        global position_x,position_y
+        position_x,position_y = new_x,new_y
         return True
+    
     return False
 
 
@@ -132,15 +135,17 @@ def do_forward(robot_name, steps):
     :param steps:
     :return: (True, forward output text)
     """
-    global blocked
     if update_position(steps):
-        robot.forward(steps)
+        turtleboi.forward(steps)
+        x,y = turtleboi.pos()
+        math.floor(x)
+        math.floor(y)
+        turtleboi.goto(x,y)
         return True, ' > '+robot_name+' moved forward by '+str(steps)+' steps.'
-    elif blocked == True:
-        blocked = False
-        return True, ' > '+robot_name+': Sorry, there is an obstacle in the way.'
+    if reason:
+        return True, f' > {robot_name}: Sorry there is an obstacle in the way.'
     else:
-        return True, ''+robot_name+': Sorry, I cannot go outside my safe zone.'
+        return True, f'{robot_name}: Sorry, I cannot go outside my safe zone'
 
 
 def do_back(robot_name, steps):
@@ -150,16 +155,18 @@ def do_back(robot_name, steps):
     :param steps:
     :return: (True, forward output text)
     """
-    global blocked
 
     if update_position(-steps):
-        robot.back(steps)
+        turtleboi.back(steps)
+        x,y = turtleboi.pos()
+        math.floor(x)
+        math.floor(y)
+        turtleboi.goto(x,y)
         return True, ' > '+robot_name+' moved back by '+str(steps)+' steps.'
-    elif blocked == True:
-        blocked = False
-        return True, ' > '+robot_name+': Sorry, there is an obstacle in the way.'
+    if reason:
+        return True, f' > {robot_name}: Sorry there is an obstacle in the way.'
     else:
-        return True, ''+robot_name+': Sorry, I cannot go outside my safe zone.'
+        return True, f'{robot_name}: Sorry, I cannot go outside my safe zone'
 
 
 def do_right_turn(robot_name):
@@ -171,9 +178,10 @@ def do_right_turn(robot_name):
     global current_direction_index
 
     current_direction_index += 1
+    turtleboi.right(90)
     if current_direction_index > 3:
         current_direction_index = 0
-    robot.right(90)
+
     return True, ' > '+robot_name+' turned right.'
 
 
@@ -186,9 +194,10 @@ def do_left_turn(robot_name):
     global current_direction_index
 
     current_direction_index -= 1
+    turtleboi.left(90)
     if current_direction_index < 0:
         current_direction_index = 3
-    robot.left(90)
+
     return True, ' > '+robot_name+' turned left.'
 
 

@@ -1,32 +1,22 @@
+import world.obstacles
+import sys
 import unittest
-import robot
-from maze import obstacles as obstacles
+from unittest.mock import patch
+from io import StringIO
+unittest.util._MAX_LENGTH = 2000
 
-class Test_Obstacles(unittest.TestCase):
+class TestObstacles(unittest.TestCase):
+	def test_path_blocked(self):
+		world.obstacles.obstacles = [(0,20)]
+		self.assertEqual(world.obstacles.is_path_blocked(0,22,0,0),True)
+	
+	def test_path_blocked_2(self):
+		world.obstacles.obstacles = [(10,0)]
+		self.assertEqual(world.obstacles.is_path_blocked(12,0,0,0),True)
 
-    def test_is_position_blocked_yes(self):
-        obstacles.obstacle_list = [(77, 89), (13, -105)] 
-        self.assertEqual(obstacles.is_position_blocked(77, 92), True)
-        robot.robot_reset()
+	
 
-
-    def test_is_position_blocked_no(self):
-        obstacles.obstacle_list = [(77, 89), (13, -105)]
-        self.assertEqual(obstacles.is_position_blocked(18, -110), False)
-        robot.robot_reset()
-
-
-    def test_is_path_blocked_yes(self):
-        obstacles.obstacle_list = [(77, 89), (13, -105)]
-        self.assertEqual(obstacles.is_path_blocked(70 , 91, 80, 91), True)
-        robot.robot_reset()
-
-
-    def test_is_path_blocked_no(self):
-        obstacles.obstacle_list = [(77, 89), (13, -105)]
-        self.assertEqual(obstacles.is_path_blocked(15 , 50, 15, -12), False)
-        robot.robot_reset()
 
 
 if __name__ == "__main__":
-   unittest.main()
+	unittest.main()

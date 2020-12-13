@@ -1,46 +1,57 @@
-import sys
-import import_helper
-if len(sys.argv) > 2:
-    if 'maze' in sys.argv[2]:
-        obstacles = import_helper.dynamic_import('maze.' + sys.argv[2])
-    else:
-        obstacles = import_helper.dynamic_import('maze.obstacles')
-else:
-    obstacles = import_helper.dynamic_import('maze.obstacles')
+from maze import obstacles
+import import_helper as ih
 
-
-
-min_y, max_y = -200, 200
-min_x, max_x = -100, 100
 # variables tracking position and direction
 position_x = 0
 position_y = 0
 directions = ['forward', 'right', 'back', 'left']
 current_direction_index = 0
-blocked = False
+
+obstacles_list = []
+
+# area limit vars
+min_y, max_y = -200, 200
+min_x, max_x = -100, 100
+
+#Reason for failing to move
+reason = False
+
+
+def setup(robot_name,argv):
+    """
+    Sets up the obstacles
+    """
+    global obstacles_list,module
+    try:
+        module = ih.dynamic_import(f"maze.{argv[2]}")
+        print(f"{robot_name}: Loaded {argv[2]}")
+    except IndexError:
+        module = ih.dynamic_import("maze.obstacles")
+    obstacles_list = module.get_obstacles()
+    if len(obstacles_list) > 0:
+        print("There are some obstcles:")
+        for obs in obstacles_list:
+            x = obs[0]
+            y = obs[1]
+            print(f"- At position {x},{y} (to {x+4},{y+4})")
 
 
 def show_position(robot_name):
     print(' > '+robot_name+' now at position ('+str(position_x)+','+str(position_y)+').')
 
 
-def is_position_allowed(position_x, position_y, new_x, new_y,):
+def is_position_allowed(new_x, new_y, old_x, old_y):
     """
     Checks if the new position will still fall within the max area limit
     :param new_x: the new/proposed x position
     :param new_y: the new/proposed y position
     :return: True if allowed, i.e. it falls in the allowed area, else False
     """
-    global blocked
-
-    if obstacles.is_path_blocked(position_x, position_y, new_x, new_y):
-        blocked = True
+    global reason
+    if module.is_path_blocked(new_x, new_y,position_x, position_y):
+        reason = True
         return False
-    else :
-    # elif is_position_blocked(new_x, new_y, obs):
-    #     blocked = True
-    #     return False
-        return min_x <= new_x <= max_x and min_y <= new_y <= max_y
+    return min_x <= new_x <= max_x and min_y <= new_y <= max_y
 
 
 def update_position(steps):
@@ -51,19 +62,23 @@ def update_position(steps):
     """
 
     global position_x, position_y
-    new_x = position_x
-    new_y = position_y
+    current_x = position_x
+    current_y = position_y
 
     if directions[current_direction_index] == 'forward':
-        new_y = new_y + steps
+        new_y = current_y + steps
+        new_x = current_x
     elif directions[current_direction_index] == 'right':
-        new_x = new_x + steps
+        new_x = current_x + steps
+        new_y = current_y
     elif directions[current_direction_index] == 'back':
-        new_y = new_y - steps
+        new_y = current_y - steps
+        new_x = current_x
     elif directions[current_direction_index] == 'left':
-        new_x = new_x - steps
+        new_x = current_x - steps
+        new_y = current_y
 
-    if is_position_allowed(position_x, position_y, new_x, new_y):
+    if is_position_allowed(new_x, new_y, current_x, current_y):
         position_x = new_x
         position_y = new_y
         return True
@@ -77,14 +92,13 @@ def do_forward(robot_name, steps):
     :param steps:
     :return: (True, forward output text)
     """
-    global blocked
     if update_position(steps):
         return True, ' > '+robot_name+' moved forward by '+str(steps)+' steps.'
-    elif blocked == True:
-        blocked = False
-        return True, ' > '+robot_name+': Sorry, there is an obstacle in the way.'
+    if reason:
+        return True, f' > {robot_name}: Sorry there is an obstacle in the way.'
     else:
-        return True, ''+robot_name+': Sorry, I cannot go outside my safe zone.'
+        return True, f'{robot_name}: Sorry, I cannot go outside my safe zone.'
+        
 
 
 def do_back(robot_name, steps):
@@ -94,14 +108,13 @@ def do_back(robot_name, steps):
     :param steps:
     :return: (True, forward output text)
     """
-    global blocked
+
     if update_position(-steps):
         return True, ' > '+robot_name+' moved back by '+str(steps)+' steps.'
-    elif blocked == True:
-        blocked = False
-        return True, ' > '+robot_name+': Sorry, there is an obstacle in the way.'
+    if reason:
+        return True, f' > {robot_name}: Sorry there is an obstacle in the way.'
     else:
-        return True, ''+robot_name+': Sorry, I cannot go outside my safe zone.'
+        return True, f'{robot_name}: Sorry, I cannot go outside my safe zone'
 
 
 def do_right_turn(robot_name):
@@ -115,6 +128,7 @@ def do_right_turn(robot_name):
     current_direction_index += 1
     if current_direction_index > 3:
         current_direction_index = 0
+
     return True, ' > '+robot_name+' turned right.'
 
 
@@ -129,6 +143,7 @@ def do_left_turn(robot_name):
     current_direction_index -= 1
     if current_direction_index < 0:
         current_direction_index = 3
+
     return True, ' > '+robot_name+' turned left.'
 
 
@@ -146,13 +161,3 @@ def do_sprint(robot_name, steps):
         (do_next, command_output) = do_forward(robot_name, steps)
         print(command_output)
         return do_sprint(robot_name, steps - 1)
-
-
-def show_obstacles():
-    """
-    This function is used to see if the get_obstacles function is called and if so it prints out the text.
-    """
-    if obstacles.get_obstacles():
-        print("There are some obstacles:")    
-        for obstacle in obstacles.get_obstacles():
-            print(f"- At position {obstacle[0]},{obstacle[1]} (to {(obstacle[0]+4)},{(obstacle[1]+4)}) ")
